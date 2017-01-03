@@ -1,0 +1,98 @@
+package jgitextractor;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.List;
+
+import org.eclipse.jgit.api.CloneCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.TransportConfigCallback;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.IndexDiff;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.TreeFormatter;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.SshSessionFactory;
+import org.eclipse.jgit.transport.SshTransport;
+import org.eclipse.jgit.transport.Transport;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.io.DisabledOutputStream;
+
+public class Main {
+
+	public static void main(String[] args) throws IOException, NoHeadException, GitAPIException {
+		
+		/** 
+		 * Os comandos que estam comentados a seguir, são responsável pela clonagem 
+		 * de um repositório remoto. 
+		 * 
+		 * -> Para repositórios no GitHub a URL de acesso precisa iniciar com git://
+		 * -> Para repositórios no BitBucket a URL de acesso precisa iniciar com https://
+		 * 
+		 * -> O comando setCredentialsProvider só é necessário se o repositório for privado.
+		 * -> O comando setURI indica o repositório privado 
+		 * -> O comando setDirectory inidica o diretório local onde será criado o clone do repositório remoto.
+		 * 
+		 * **/
+		
+//	    Git git = Git.cloneRepository()
+//	       .setURI("https://vandersonmoura@bitbucket.org/vandersonmoura/repositorioteste")
+//	       .setDirectory(new File("D://teste//.git"))
+//	       .setBare(false)
+//	       .setCredentialsProvider(new UsernamePasswordCredentialsProvider("codivision", "kR8#!pQx"))
+//	       .call();
+		
+		/** 
+		 * Após realizar o clone de um repositório remoto pode-se criar instancia Git a partir de um repositório local.
+		 * Isso só pode ser feito após o checkout do projeto do repositório remoto.
+		 * 
+		 * **/
+		File localRepo = new File("D://teste/.git");
+		Git git = Git.open( localRepo );
+		
+		/** Aqui é obtido o log das revisões **/
+	    Iterable<RevCommit> log = git.log().call();
+	    for (Iterator<RevCommit> iterator = log.iterator(); iterator.hasNext();) {
+	      RevCommit rev = iterator.next();
+	      System.out.println(rev.getFullMessage());
+	      System.out.println(rev.getName());
+	      System.out.println(rev.getType());
+	      System.out.println(rev.getAuthorIdent());
+	    }
+		
+	    /** 
+		 * Aqui são obtidos os diffs dos arquivos modificados na última revisão (HEAD)
+		 * 
+		 * TODO: Criar métodos que identifiquem os arquivos modificados em cada revisão
+		 * e a partir daí obter os diffs desses arquivos específicos. 
+		 * **/
+     
+		ObjectReader reader = git.getRepository().newObjectReader();
+		CanonicalTreeParser oldTreeIter = new CanonicalTreeParser();
+		ObjectId oldTree = git.getRepository().resolve("HEAD~^{tree}");
+		oldTreeIter.reset( reader, oldTree );
+		CanonicalTreeParser newTreeIter = new CanonicalTreeParser();
+		ObjectId newTree = git.getRepository().resolve("HEAD^{tree}");
+		newTreeIter.reset( reader, newTree );
+
+		DiffFormatter diffFormatter = new DiffFormatter( System.out );
+		diffFormatter.setRepository( git.getRepository() );
+		List<DiffEntry> entries = diffFormatter.scan( oldTreeIter, newTreeIter );
+
+		for( DiffEntry entry : entries ) {
+			diffFormatter.format(entry);
+			System.out.println(entry);
+		}
+	}
+}
